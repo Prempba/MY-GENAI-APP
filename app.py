@@ -55,7 +55,7 @@ if prompt := st.chat_input("Ask me anything..."):
                 # Add persona context to prompt
                 full_prompt = f"System Persona: Act as a {system_persona}.\nUser Query: {prompt}"
                 
-                url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+              url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
                 headers = {"Content-Type": "application/json"}
                 data = {"contents": [{"parts": [{"text": full_prompt}]}]}
                 
