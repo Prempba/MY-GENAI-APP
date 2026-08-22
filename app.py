@@ -2,49 +2,62 @@ import os
 import requests
 import streamlit as st
 from dotenv import load_dotenv
-from PIL import Image
 
-# Load local environment variables
 load_dotenv()
 
-# Set up page configuration
-st.set_page_config(page_title="GenAI Assistant", page_icon="🤖")
-st.title("🤖 GenAI Assistant")
+st.set_page_config(page_title="GenAI Assistant", page_icon="🤖", layout="wide")
 
-# Fetch API key automatically from Streamlit Cloud Secrets or local .env file
-api_key = st.secrets.get("GEMINI_API_KEY") or os.getenv("GEMINI_API_KEY")
+# Fetch API Key securely from Streamlit Secrets
+try:
+    api_key = st.secrets["GEMINI_API_KEY"]
+except Exception:
+    api_key = os.getenv("GEMINI_API_KEY")
 
 if not api_key:
-    st.error("⚠️ Gemini API Key not found! Please check your Streamlit Secrets or .env file.")
+    st.error("⚠️ GEMINI_API_KEY is missing from Secrets.")
     st.stop()
 
-# Initialize chat memory in session state
+# --- SIDEBAR CONTROLS ---
+with st.sidebar:
+    st.header("⚙️ App Settings")
+    st.success("API Key loaded successfully!")
+    
+    system_persona = st.selectbox(
+        "Choose Assistant Persona:",
+        ["Helpful Assistant", "Code Expert", "Creative Writer", "Strict Tutor"]
+    )
+    
+    if st.button("🗑️ Clear Chat History"):
+        st.session_state.messages = []
+        st.rerun()
+
+st.title("🤖 GenAI Assistant")
+st.caption(f"Currently acting as: **{system_persona}**")
+
+# Initialize Chat
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# Display previous chat history
+# Display Chat History
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-# User Chat Input
+# User Input Box
 if prompt := st.chat_input("Ask me anything..."):
-    # Display user query in chat
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
 
-    # Send request to Gemini API
     with st.chat_message("assistant"):
         with st.spinner("Thinking..."):
             try:
+                # Add persona context to prompt
+                full_prompt = f"System Persona: Act as a {system_persona}.\nUser Query: {prompt}"
+                
                 url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
                 headers = {"Content-Type": "application/json"}
-                data = {
-                    "contents": [{
-                        "parts": [{"text": prompt}]
-                    }]
-                }
+                data = {"contents": [{"parts": [{"text": full_prompt}]}]}
                 
                 response = requests.post(url, headers=headers, json=data)
                 result = response.json()
@@ -54,8 +67,7 @@ if prompt := st.chat_input("Ask me anything..."):
                     st.markdown(bot_response)
                     st.session_state.messages.append({"role": "assistant", "content": bot_response})
                 else:
-                    error_msg = result.get("error", {}).get("message", "Failed to connect to API.")
-                    st.error(f"API Error: {error_msg}")
+                    st.error(f"Error: {result.get('error', {}).get('message', 'API request failed')}")
 
             except Exception as e:
-                st.error(f"An error occurred: {e}")
+                st.error(f"Error: {e}")
