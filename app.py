@@ -3,85 +3,146 @@ import base64
 import requests
 import streamlit as st
 from dotenv import load_dotenv
-from PIL import Image
 
-# Load environment variables for local testing
 load_dotenv()
 
-st.set_page_config(page_title="GenAI Multi-Modal Suite", page_icon="🤖", layout="wide")
+# Set up page styling
+st.set_page_config(page_title="Prem PBA", page_icon="🔍", layout="centered")
 
-# Securely retrieve API Key from Secrets or Local .env
+# Custom CSS to mimic Perplexity's minimal light-mode interface
+st.markdown("""
+    <style>
+    .main {
+        background-color: #FAFAFA;
+    }
+    .big-title {
+        font-family: 'Helvetica Neue', sans-serif;
+        font-size: 42px;
+        font-weight: 600;
+        text-align: center;
+        color: #1F2937;
+        margin-top: 10vh;
+        margin-bottom: 25px;
+        letter-spacing: -1px;
+    }
+    .stButton>button {
+        border-radius: 20px;
+        border: 1px solid #E5E7EB;
+        background-color: #FFFFFF;
+        color: #374151;
+        font-size: 14px;
+        padding: 6px 18px;
+    }
+    .stButton>button:hover {
+        background-color: #F3F4F6;
+        border-color: #D1D5DB;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
+# Fetch API Key securely
 try:
     api_key = st.secrets["GEMINI_API_KEY"]
 except Exception:
     api_key = os.getenv("GEMINI_API_KEY")
 
 if not api_key:
-    st.error("⚠️ GEMINI_API_KEY is missing! Set it in Streamlit Secrets.")
+    st.error("⚠️ GEMINI_API_KEY is missing! Configure it in Streamlit Secrets.")
     st.stop()
 
-# --- SIDEBAR CONTROLS ---
-with st.sidebar:
-    st.title("⚙️ Control Panel")
-    st.success("🟢 API Key Loaded")
-    
-    # 1. Persona Switcher
-    system_persona = st.selectbox(
-        "Choose Assistant Persona:",
-        ["Helpful Assistant", "Code Expert", "Creative Writer", "Data Analyst"]
-    )
-    
-    # 2. Image Uploader Feature
-    st.subheader("📷 Vision Analysis")
-    uploaded_image = st.file_uploader("Upload an image to ask questions about it:", type=["png", "jpg", "jpeg"])
-    
-    if uploaded_image:
-        st.image(uploaded_image, caption="Uploaded Image Preview", use_container_width=True)
-    
-    # 3. Clear Chat Button
-    st.divider()
-    if st.button("🗑️ Clear Chat History", use_container_width=True):
-        st.session_state.messages = []
-        st.rerun()
+# Initialize session state for active prompt
+if "input_query" not in st.session_state:
+    st.session_state.input_query = ""
 
-st.title("🤖 GenAI Multi-Modal Suite")
-st.caption(f"Active Mode: **{system_persona}**")
-
-# Initialize Chat Memory
 if "messages" not in st.session_state:
     st.session_state.messages = []
+
+# Top Header Title
+st.markdown('<div class="big-title">Prem PBA</div>', unsafe_allow_html=True)
+
+# --- SIDEBAR FOR EXTRA APPLICATIONS ---
+with st.sidebar:
+    st.title("⚡ Prem PBA Tools")
+    st.success("🟢 Connected")
+    
+    # 1. Attachment / Image Analyzer
+    st.subheader("📎 Attach Files & Images")
+    uploaded_file = st.file_uploader("Upload image for analysis:", type=["png", "jpg", "jpeg"])
+    if uploaded_file:
+        st.image(uploaded_file, caption="Attached Image", use_container_width=True)
+        
+    # 2. Mode Selector
+    st.divider()
+    search_mode = st.selectbox(
+        "Focus Mode:",
+        ["All / Web Search", "Code Assistant", "Deep Academic Research", "Creative Writing"]
+    )
+    
+    # 3. Clear Chat
+    if st.button("🗑️ Clear Workspace", use_container_width=True):
+        st.session_state.messages = []
+        st.session_state.input_query = ""
+        st.rerun()
 
 # Display Chat History
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-# User Chat Input
-if prompt := st.chat_input("Ask a question or describe your image..."):
-    # Render user prompt in chat
-    st.session_state.messages.append({"role": "user", "content": prompt})
+# Quick action suggestion chip handler
+def set_query(query_text):
+    st.session_state.input_query = query_text
+
+# Action Chips (Mimicking screenshot layout)
+col1, col2, col3, col4 = st.columns(4)
+with col1:
+    if st.button("📝 Summarise"):
+        set_query("Summarise the key points of: ")
+with col2:
+    if st.button("🔍 Research"):
+        set_query("Provide a detailed research analysis on: ")
+with col3:
+    if st.button("⭐ Recommend"):
+        set_query("Give me top recommendations for: ")
+with col4:
+    if st.button("✈️ Travel"):
+        set_query("Create a travel itinerary for: ")
+
+st.write("")
+
+# Chat Input Area
+prompt = st.chat_input("Ask anything...", key="chat_input")
+
+# Use button selection if chat input is empty
+final_prompt = prompt or st.session_state.input_query
+
+if final_prompt and (prompt or st.session_state.input_query):
+    # Reset preset query
+    st.session_state.input_query = ""
+    
+    # Display user query
+    st.session_state.messages.append({"role": "user", "content": final_prompt})
     with st.chat_message("user"):
-        st.markdown(prompt)
+        st.markdown(final_prompt)
 
     with st.chat_message("assistant"):
-        with st.spinner("Analyzing..."):
+        with st.spinner("Searching & Reasoning..."):
             try:
-                # Prepare API payload parts
-                prompt_parts = [{"text": f"System Persona: Act as a {system_persona}.\nUser Query: {prompt}"}]
+                prompt_parts = [{"text": f"System Mode: {search_mode}\nUser Request: {final_prompt}"}]
                 
-                # Convert image to base64 if uploaded
-                if uploaded_image:
-                    image_bytes = uploaded_image.getvalue()
+                # Image processing if attached
+                if uploaded_file:
+                    image_bytes = uploaded_file.getvalue()
                     encoded_image = base64.b64encode(image_bytes).decode("utf-8")
                     prompt_parts.append({
                         "inline_data": {
-                            "mime_type": uploaded_image.type,
+                            "mime_type": uploaded_file.type,
                             "data": encoded_image
                         }
                     })
 
-                # API Request to Gemini
-                url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key={api_key}"
+                # API call using stable endpoint
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
                 headers = {"Content-Type": "application/json"}
                 payload = {"contents": [{"parts": prompt_parts}]}
 
@@ -93,8 +154,7 @@ if prompt := st.chat_input("Ask a question or describe your image..."):
                     st.markdown(bot_response)
                     st.session_state.messages.append({"role": "assistant", "content": bot_response})
                 else:
-                    err_details = result.get("error", {}).get("message", "API Request Failed")
-                    st.error(f"Error: {err_details}")
+                    st.error(f"Error: {result.get('error', {}).get('message', 'API Request failed')}")
 
             except Exception as e:
                 st.error(f"Execution Error: {e}")
