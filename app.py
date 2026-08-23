@@ -142,7 +142,7 @@ if final_prompt and (prompt or st.session_state.input_query):
                     })
 
                 # API call using stable endpoint
-                url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key={api_key}"
                 headers = {"Content-Type": "application/json"}
                 payload = {"contents": [{"parts": prompt_parts}]}
 
